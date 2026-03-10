@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  whatsapp-panel:
+    build: .
+    container_name: whatsapp-panel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # As URLs aqui devem estar em um .env na raiz antes de dar run ou injetadas diretamente
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
