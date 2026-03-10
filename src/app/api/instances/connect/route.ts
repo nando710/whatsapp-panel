@@ -37,9 +37,29 @@ export async function GET(req: Request) {
         const qrcodeBase64 = data.base64 || null;
         let status = 'connecting';
 
-        // if evolution responds with an instance already active:
-        if (data.instance?.state === 'open') {
+        // Check if Evolution says it's already 'open'
+        if (data.instance?.state === 'open' || data.instance?.status === 'open') {
             status = 'open';
+        } else if (data.instance?.state === 'close' || data.instance?.status === 'close') {
+            status = 'close';
+        }
+
+        // If no QR Code is present, check specific instance connection status to be precise
+        if (!qrcodeBase64 && status === 'connecting') {
+            try {
+                const checkRes = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
+                    method: 'GET',
+                    headers: { 'apikey': EVOLUTION_API_KEY }
+                });
+                if (checkRes.ok) {
+                    const checkData = await checkRes.json();
+                    if (checkData?.instance?.state === 'open' || checkData?.state === 'open') {
+                        status = 'open';
+                    }
+                }
+            } catch (e) {
+                console.error("Could not fetch connection state explicitly", e);
+            }
         }
 
         // Update in Supabase
