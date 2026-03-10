@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, QrCode, RefreshCcw, Smartphone, Trash2 } from 'lucide-react';
+import { PlusCircle, QrCode, RefreshCcw, Smartphone, Trash2, DownloadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface WhatsAppInstance {
@@ -14,6 +14,7 @@ interface WhatsAppInstance {
     instance_name: string;
     status: string;
     qrcode: string | null;
+    instance_api_key?: string | null;
     updated_at: string;
 }
 
@@ -21,6 +22,7 @@ export function InstanceManager() {
     const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
     const [open, setOpen] = useState(false);
     const [newInstanceName, setNewInstanceName] = useState('');
+    const [newInstanceApiKey, setNewInstanceApiKey] = useState('');
     const [loading, setLoading] = useState(false);
     const [activeQrCode, setActiveQrCode] = useState<string | null>(null);
     const [activeInstanceName, setActiveInstanceName] = useState<string | null>(null);
@@ -70,7 +72,10 @@ export function InstanceManager() {
             const response = await fetch('/api/instances/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ instanceName: newInstanceName.replace(/\s+/g, '-') }), // No spaces allowed usually
+                body: JSON.stringify({
+                    instanceName: newInstanceName.replace(/\s+/g, '-'),
+                    instanceApiKey: newInstanceApiKey.trim() || undefined
+                }), // No spaces allowed usually
             });
 
             const data = await response.json();
@@ -81,6 +86,7 @@ export function InstanceManager() {
 
             toast.success('Instance created! Generating QR Code...');
             setNewInstanceName('');
+            setNewInstanceApiKey('');
 
             if (data.qrcode) {
                 setActiveQrCode(data.qrcode);
@@ -120,6 +126,26 @@ export function InstanceManager() {
                 toast.info('Instance is connecting or restarting. Try again in a few seconds.');
             }
 
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSyncMessages = async (name: string, apiKey?: string | null) => {
+        setLoading(true);
+        toast.info(`Syncing historical messages for ${name}...`);
+        try {
+            const response = await fetch('/api/instances/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instanceName: name, instanceApiKey: apiKey || undefined }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to sync messages');
+            toast.success(`Successfully pulled ${data.count} historical messages!`);
+            // Trigger a UI refresh if there is a way or let realtime handle it (Realtime handles insertions so dashboard should update!)
         } catch (error: any) {
             toast.error(error.message);
         } finally {
@@ -179,20 +205,34 @@ export function InstanceManager() {
                 ) : (
                     <div className="space-y-6">
                         {/* Create New Instance */}
-                        <div className="flex gap-2 items-end">
-                            <div className="grid gap-2 flex-1">
-                                <Label htmlFor="name">New Instance Name</Label>
+                        <div className="flex flex-col gap-4 border p-4 rounded-lg bg-slate-50/50 dark:bg-slate-900/50">
+                            <h4 className="font-medium text-sm">Add New Instance</h4>
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Instance Name</Label>
                                 <Input
                                     id="name"
                                     placeholder="e.g. Support-Team"
                                     value={newInstanceName}
                                     onChange={(e) => setNewInstanceName(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleCreateInstance()}
+                                    disabled={loading}
                                 />
                             </div>
-                            <Button onClick={handleCreateInstance} disabled={loading || !newInstanceName}>
+                            <div className="grid gap-2">
+                                <Label htmlFor="apikey">Instance API Key (optional)</Label>
+                                <Input
+                                    id="apikey"
+                                    type="password"
+                                    placeholder="Leave blank to use global API Key"
+                                    value={newInstanceApiKey}
+                                    onChange={(e) => setNewInstanceApiKey(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleCreateInstance()}
+                                    disabled={loading}
+                                />
+                                <p className="text-[10px] text-muted-foreground">Used for fetching messages or if your Evolution host doesn't use a Global API Key.</p>
+                            </div>
+                            <Button onClick={handleCreateInstance} disabled={loading || !newInstanceName} className="mt-2 w-full sm:w-auto">
                                 <PlusCircle className="w-4 h-4 mr-2" />
-                                Create
+                                Create / Connect
                             </Button>
                         </div>
 
@@ -215,6 +255,18 @@ export function InstanceManager() {
                                             </div>
 
                                             <div className="flex gap-2">
+                                                {instance.status === 'open' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8"
+                                                        onClick={() => handleSyncMessages(instance.instance_name, instance.instance_api_key)}
+                                                        disabled={loading}
+                                                        title="Pull historical messages"
+                                                    >
+                                                        <DownloadCloud className="w-4 h-4 text-blue-500" />
+                                                    </Button>
+                                                )}
                                                 {instance.status !== 'open' && (
                                                     <Button
                                                         variant="outline"

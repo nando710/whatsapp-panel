@@ -41,6 +41,7 @@ CREATE TABLE instances (
   instance_name TEXT NOT NULL UNIQUE,
   status TEXT DEFAULT 'created',
   qrcode TEXT,
+  instance_api_key TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

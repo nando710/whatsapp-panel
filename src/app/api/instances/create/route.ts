@@ -8,7 +8,7 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 
 export async function POST(req: Request) {
     try {
-        const { instanceName } = await req.json();
+        const { instanceName, instanceApiKey } = await req.json();
 
         if (!instanceName) {
             return NextResponse.json({ error: 'instanceName is required' }, { status: 400 });
@@ -18,15 +18,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Evolution API credentials not configured' }, { status: 500 });
         }
 
+        const apiKeyToUse = instanceApiKey || EVOLUTION_API_KEY;
+
         // 1. Call Evolution API to create the instance
         const evolutionRes = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY,
+                'apikey': apiKeyToUse,
             },
             body: JSON.stringify({
                 instanceName: instanceName,
+                token: instanceApiKey || undefined, // Sometimes helpful depending on Api Version
                 qrcode: true, // Auto-generate QR on creation
                 integration: 'WHATSAPP-BAILEYS',
                 webhook_wa_business: false, // Make sure it's regular WA if needed
@@ -58,6 +61,7 @@ export async function POST(req: Request) {
                 instance_name: instanceName,
                 status: 'connecting',
                 qrcode: qrcode?.base64 || null,
+                instance_api_key: instanceApiKey || null
             }]);
 
         if (dbError) {
@@ -65,7 +69,7 @@ export async function POST(req: Request) {
             if (dbError.code === '23505') {
                 await adminClient
                     .from('instances')
-                    .update({ status: 'connecting', qrcode: qrcode?.base64 || null, updated_at: new Date().toISOString() })
+                    .update({ status: 'connecting', qrcode: qrcode?.base64 || null, instance_api_key: instanceApiKey || null, updated_at: new Date().toISOString() })
                     .eq('instance_name', instanceName);
             } else {
                 console.error('Supabase error inserting instance:', dbError);
